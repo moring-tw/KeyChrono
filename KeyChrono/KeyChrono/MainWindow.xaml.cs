@@ -12,22 +12,23 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 
-namespace CountdownApp
+namespace KeyChrono
 {
     public partial class MainWindow : Window
     {
         public class TimerConfig
         {
+            public string Name { get; set; }
             public string HotkeyStr { get; set; }
             public int Duration { get; set; }
             public int X { get; set; }
             public int Y { get; set; }
             public int Width { get; set; }
             public int Height { get; set; }
+            public int FontSize { get; set; } // 新增: 字體大小
             public bool AutoRestart { get; set; }
             public string ImagePath { get; set; }
 
-            // 加上 JsonIgnore，避免儲存時把這個只讀用的屬性也存入 JSON
             [JsonIgnore]
             public string Coordinates => $"{X}, {Y}";
             [JsonIgnore]
@@ -38,38 +39,50 @@ namespace CountdownApp
         private Dictionary<string, TimerWindow> activeTimers = new Dictionary<string, TimerWindow>();
         private readonly string configFilePath;
 
-        public MainWindow()
-        {
+        public MainWindow() {
             InitializeComponent();
 
-            // 設定 AppData 儲存路徑 (C:\Users\使用者\AppData\Roaming\CountdownApp\timers.json)
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string appFolder = Path.Combine(appData, "CountdownApp");
+            string appFolder = Path.Combine(appData, "KeyChrono");
             if (!Directory.Exists(appFolder)) Directory.CreateDirectory(appFolder);
             configFilePath = Path.Combine(appFolder, "timers.json");
 
             TimerList.ItemsSource = configs;
-
-            // 程式啟動時載入設定
             LoadConfigs();
+
+            // 【新增】：註冊全域 ESC 快捷鍵，用來一鍵關閉所有計時器
+            try
+            {
+                HotkeyManager.Current.AddOrReplace("CloseAllTimers", Key.Escape, ModifierKeys.Shift, OnCloseAllTimers);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("全域 ESC 快捷鍵註冊失敗，可能與系統衝突: " + ex.Message);
+            }
         }
 
-        // --- 功能 1: 存檔與讀取 ---
-        private void SaveConfigs()
-        {
+        // 【新增】：一鍵關閉所有計時器的邏輯
+        private void OnCloseAllTimers(object sender, HotkeyEventArgs e) {
+            // 將字典的 Key 複製成 List，避免在 foreach 迴圈中修改集合導致錯誤
+            var keys = activeTimers.Keys.ToList();
+            foreach (var key in keys)
+            {
+                activeTimers[key].Close();
+            }
+            activeTimers.Clear();
+            e.Handled = true;
+        }
+
+        private void SaveConfigs() {
             try
             {
                 string json = JsonSerializer.Serialize(configs);
                 File.WriteAllText(configFilePath, json);
             }
-            catch (Exception ex)
-            {
-                MessageBox.Show("儲存設定檔失敗: " + ex.Message);
-            }
+            catch (Exception ex) { MessageBox.Show("儲存設定檔失敗: " + ex.Message); }
         }
 
-        private void LoadConfigs()
-        {
+        private void LoadConfigs() {
             if (File.Exists(configFilePath))
             {
                 try
@@ -82,77 +95,82 @@ namespace CountdownApp
                         KeyGestureConverter converter = new KeyGestureConverter();
                         foreach (var c in loadedConfigs)
                         {
+                            // 舊版本設定檔相容處理：如果讀取不到字體大小，預設給 72
+                            if (c.FontSize == 0) c.FontSize = 72;
                             configs.Add(c);
-                            // 重新註冊快捷鍵
-                            KeyGesture gesture = (KeyGesture)converter.ConvertFromString(c.HotkeyStr);
-                            HotkeyManager.Current.AddOrReplace(c.HotkeyStr, gesture.Key, gesture.Modifiers, OnHotkeyTriggered);
+                        }
+
+                        var uniqueHotkeys = configs.Select(c => c.HotkeyStr).Distinct();
+                        foreach (var hk in uniqueHotkeys)
+                        {
+                            KeyGesture gesture = (KeyGesture)converter.ConvertFromString(hk);
+                            HotkeyManager.Current.AddOrReplace(hk, gesture.Key, gesture.Modifiers, OnHotkeyTriggered);
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("載入設定檔失敗: " + ex.Message);
-                }
+                catch (Exception ex) { MessageBox.Show("載入設定檔失敗: " + ex.Message); }
             }
         }
 
-        private void BrowseImage_Click(object sender, RoutedEventArgs e)
-        {
+        private void BrowseImage_Click(object sender, RoutedEventArgs e) {
             OpenFileDialog dlg = new OpenFileDialog();
             dlg.Filter = "Image Files|*.jpg;*.jpeg;*.png;*.bmp";
-            if (dlg.ShowDialog() == true)
-            {
-                ImageInput.Text = dlg.FileName;
-            }
+            if (dlg.ShowDialog() == true) ImageInput.Text = dlg.FileName;
         }
 
-        private void AddTimer_Click(object sender, RoutedEventArgs e)
-        {
+        private void AddTimer_Click(object sender, RoutedEventArgs e) {
             try
             {
+                string name = NameInput.Text.Trim();
                 int time = int.Parse(TimeInput.Text);
                 int x = int.Parse(XInput.Text);
                 int y = int.Parse(YInput.Text);
                 int width = int.Parse(WidthInput.Text);
                 int height = int.Parse(HeightInput.Text);
+                int fontSize = int.Parse(FontSizeInput.Text); // 讀取字體大小
                 bool autoRestart = AutoRestartCheck.IsChecked ?? false;
                 string imgPath = ImageInput.Text;
                 string hkStr = HotkeyInput.Text.Trim();
 
-                if (string.IsNullOrEmpty(imgPath) || string.IsNullOrEmpty(hkStr))
+                if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(imgPath) || string.IsNullOrEmpty(hkStr))
                 {
-                    MessageBox.Show("請完整輸入圖片路徑與快捷鍵！", "錯誤", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("請完整輸入名稱、圖片路徑與快捷鍵！", "錯誤", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 KeyGestureConverter converter = new KeyGestureConverter();
                 KeyGesture gesture = (KeyGesture)converter.ConvertFromString(hkStr);
 
-                // 如果設定中已經有同一個快捷鍵，先將舊的移除 (當作是更新設定)
-                var existingConfig = configs.FirstOrDefault(c => c.HotkeyStr.Equals(hkStr, StringComparison.OrdinalIgnoreCase));
+                var existingConfig = configs.FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
                 if (existingConfig != null)
                 {
+                    string oldHk = existingConfig.HotkeyStr;
                     configs.Remove(existingConfig);
+
+                    if (!configs.Any(c => c.HotkeyStr.Equals(oldHk, StringComparison.OrdinalIgnoreCase)) && oldHk != hkStr)
+                    {
+                        HotkeyManager.Current.Remove(oldHk);
+                    }
                 }
 
-                // 註冊 / 覆蓋全域快捷鍵
                 HotkeyManager.Current.AddOrReplace(hkStr, gesture.Key, gesture.Modifiers, OnHotkeyTriggered);
 
                 configs.Add(new TimerConfig
                 {
+                    Name = name,
                     HotkeyStr = hkStr,
                     Duration = time,
                     X = x,
                     Y = y,
                     Width = width,
                     Height = height,
+                    FontSize = fontSize, // 儲存字體大小
                     AutoRestart = autoRestart,
                     ImagePath = imgPath
                 });
 
-                // 觸發存檔
                 SaveConfigs();
-                MessageBox.Show($"成功儲存快捷鍵設定: {hkStr}", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"成功儲存計時器: {name}", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -160,71 +178,89 @@ namespace CountdownApp
             }
         }
 
-        // --- 功能 2: 刪除計時器 ---
-        private void DeleteTimer_Click(object sender, RoutedEventArgs e)
-        {
+        private void DeleteTimer_Click(object sender, RoutedEventArgs e) {
             if (TimerList.SelectedItem is TimerConfig selectedConfig)
             {
-                // 如果該計時器正在執行，先強制關閉它
-                if (activeTimers.ContainsKey(selectedConfig.HotkeyStr))
+                if (activeTimers.ContainsKey(selectedConfig.Name))
                 {
-                    activeTimers[selectedConfig.HotkeyStr].Close();
-                    activeTimers.Remove(selectedConfig.HotkeyStr);
+                    activeTimers[selectedConfig.Name].Close();
+                    activeTimers.Remove(selectedConfig.Name);
                 }
 
-                // 解除註冊快捷鍵
-                HotkeyManager.Current.Remove(selectedConfig.HotkeyStr);
-
-                // 從清單中移除並存檔
+                string hkStr = selectedConfig.HotkeyStr;
                 configs.Remove(selectedConfig);
+
+                if (!configs.Any(c => c.HotkeyStr.Equals(hkStr, StringComparison.OrdinalIgnoreCase)))
+                {
+                    HotkeyManager.Current.Remove(hkStr);
+                }
+
                 SaveConfigs();
-            }
-            else
+            } else
             {
                 MessageBox.Show("請先在下方清單選擇要刪除的計時器！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
-        // --- 功能 3: 點擊清單項目自動帶入上方輸入框 ---
-        private void TimerList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
+        private void TimerList_SelectionChanged(object sender, SelectionChangedEventArgs e) {
             if (TimerList.SelectedItem is TimerConfig selectedConfig)
             {
+                NameInput.Text = selectedConfig.Name;
                 TimeInput.Text = selectedConfig.Duration.ToString();
                 ImageInput.Text = selectedConfig.ImagePath;
                 XInput.Text = selectedConfig.X.ToString();
                 YInput.Text = selectedConfig.Y.ToString();
                 WidthInput.Text = selectedConfig.Width.ToString();
                 HeightInput.Text = selectedConfig.Height.ToString();
+                FontSizeInput.Text = selectedConfig.FontSize.ToString(); // 自動帶入字體大小
                 AutoRestartCheck.IsChecked = selectedConfig.AutoRestart;
                 HotkeyInput.Text = selectedConfig.HotkeyStr;
             }
         }
 
-        private void OnHotkeyTriggered(object sender, HotkeyEventArgs e)
-        {
+        private void OnHotkeyTriggered(object sender, HotkeyEventArgs e) {
             string hkStr = e.Name;
 
-            if (activeTimers.ContainsKey(hkStr))
-            {
-                activeTimers[hkStr].Close();
-                activeTimers.Remove(hkStr);
-            }
-            else
-            {
-                TimerConfig config = configs.FirstOrDefault(c => c.HotkeyStr.Equals(hkStr, StringComparison.OrdinalIgnoreCase));
+            var matchingConfigs = configs.Where(c => c.HotkeyStr.Equals(hkStr, StringComparison.OrdinalIgnoreCase)).ToList();
 
-                if (config != null)
+            foreach (var config in matchingConfigs)
+            {
+                if (activeTimers.ContainsKey(config.Name))
                 {
-                    TimerWindow tw = new TimerWindow(hkStr, config.Duration, config.ImagePath, config.X, config.Y, config.Width, config.Height, config.AutoRestart);
+                    activeTimers[config.Name].ToggleTimer();
+                } else
+                {
+                    // 傳遞 FontSize 參數
+                    TimerWindow tw = new TimerWindow(config.Name, config.Duration, config.ImagePath, config.X, config.Y, config.Width, config.Height, config.FontSize, config.AutoRestart);
+
+                    tw.OnLocationChanged = (nameId, newX, newY) =>
+                    {
+                        var c = configs.FirstOrDefault(x => x.Name.Equals(nameId, StringComparison.OrdinalIgnoreCase));
+                        if (c != null)
+                        {
+                            c.X = newX;
+                            c.Y = newY;
+                            SaveConfigs();
+
+                            var selected = TimerList.SelectedItem;
+                            TimerList.Items.Refresh();
+                            TimerList.SelectedItem = selected;
+
+                            if (TimerList.SelectedItem == c)
+                            {
+                                XInput.Text = newX.ToString();
+                                YInput.Text = newY.ToString();
+                            }
+                        }
+                    };
 
                     tw.Closed += (s, args) =>
                     {
-                        if (activeTimers.ContainsKey(hkStr)) activeTimers.Remove(hkStr);
+                        if (activeTimers.ContainsKey(config.Name)) activeTimers.Remove(config.Name);
                     };
 
                     tw.Show();
-                    activeTimers[hkStr] = tw;
+                    activeTimers[config.Name] = tw;
                 }
             }
             e.Handled = true;

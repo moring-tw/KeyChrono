@@ -1,38 +1,43 @@
 ﻿using System;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
-namespace CountdownApp
+namespace KeyChrono
 {
     public partial class TimerWindow : Window
     {
-        private string hotkeyId;
-        private int initialDuration; // 記住初始秒數供重置使用
+        private string timerName;
+        private int initialDuration;
         private int timeLeft;
-        private bool autoRestart;    // 記住是否自動重啟
+        private bool autoRestart;
         private DispatcherTimer countdownTimer;
         private DispatcherTimer blinkTimer;
+        private bool isRunning;
 
-        // 參數新增了 imgWidth, imgHeight, autoRestart
-        public TimerWindow(string hotkeyId, int duration, string imagePath, int x, int y, int imgWidth, int imgHeight, bool autoRestart)
-        {
+        public Action<string, int, int> OnLocationChanged;
+
+        // 新增接收 fontSize 參數
+        public TimerWindow(string timerName, int duration, string imagePath, int x, int y, int imgWidth, int imgHeight, int fontSize, bool autoRestart) {
             InitializeComponent();
-            this.hotkeyId = hotkeyId;
+            this.timerName = timerName;
             this.initialDuration = duration;
             this.timeLeft = duration;
             this.autoRestart = autoRestart;
 
-            // 1. 強制視窗置頂 (TopMost) 與設定座標
+            NameText.Text = timerName;
+
+            // 套用主畫面設定的字體大小
+            TimeText.FontSize = fontSize;
+
             this.Topmost = true;
             this.Left = x;
             this.Top = y;
 
-            // 2. 套用自訂的圖片顯示大小
             BgImage.Width = imgWidth;
             BgImage.Height = imgHeight;
 
-            // 3. 載入無邊框圖片
             try
             {
                 BitmapImage bitmap = new BitmapImage(new Uri(imagePath, UriKind.Absolute));
@@ -45,62 +50,89 @@ namespace CountdownApp
 
             TimeText.Text = timeLeft.ToString();
 
-            // 4. 設定倒數計時器
             countdownTimer = new DispatcherTimer();
             countdownTimer.Interval = TimeSpan.FromSeconds(1);
             countdownTimer.Tick += CountdownTimer_Tick;
-            countdownTimer.Start();
 
-            // 5. 設定閃爍計時器
             blinkTimer = new DispatcherTimer();
             blinkTimer.Interval = TimeSpan.FromMilliseconds(300);
             blinkTimer.Tick += BlinkTimer_Tick;
+
+            StartTimer();
         }
 
-        private void CountdownTimer_Tick(object sender, EventArgs e)
-        {
+        public void StartTimer() {
+            timeLeft = initialDuration;
+            TimeText.Text = timeLeft.ToString();
+            BgImage.Visibility = Visibility.Visible;
+            countdownTimer.Start();
+            isRunning = true;
+        }
+
+        public void StopAndResetTimer() {
+            countdownTimer.Stop();
+            blinkTimer.Stop();
+            BgImage.Visibility = Visibility.Visible;
+            timeLeft = initialDuration;
+            TimeText.Text = "STOP";
+            isRunning = false;
+        }
+
+        public void ToggleTimer() {
+            if (isRunning) StopAndResetTimer();
+            else StartTimer();
+        }
+
+        private void CountdownTimer_Tick(object sender, EventArgs e) {
             timeLeft--;
+            if(countdownTimer.IsEnabled == false)
+            {
+                TimeText.Text = "STOP";
+                blinkTimer.Stop();
+                isRunning = false;
+                return;
+            }
 
             if (timeLeft > 0)
             {
                 TimeText.Text = timeLeft.ToString();
-
-                // 剩餘 5 秒 (含) 內啟動閃爍機制
-                if (timeLeft <= 5 && !blinkTimer.IsEnabled)
-                {
-                    blinkTimer.Start();
-                }
-            }
-            else
+                if (timeLeft <= 5 && !blinkTimer.IsEnabled) blinkTimer.Start();
+            } else
             {
-                // 時間歸零的判斷邏輯
                 if (this.autoRestart)
                 {
-                    // 【啟用自動重計】重置時間、停止閃爍、確保圖片顯示，然後繼續倒數
-                    this.timeLeft = this.initialDuration;
-                    this.TimeText.Text = this.timeLeft.ToString();
-
-                    this.blinkTimer.Stop();
-                    this.BgImage.Visibility = Visibility.Visible;
-                }
-                else
+                    timeLeft = initialDuration;
+                    TimeText.Text = timeLeft.ToString();
+                    blinkTimer.Stop();
+                    BgImage.Visibility = Visibility.Visible;
+                } else
                 {
-                    // 【未啟用自動重計】直接關閉視窗
                     countdownTimer.Stop();
                     blinkTimer.Stop();
-                    this.Close();
+                    BgImage.Visibility = Visibility.Visible;
+                    TimeText.Text = "0";
+                    isRunning = false;
                 }
             }
         }
 
-        private void BlinkTimer_Tick(object sender, EventArgs e)
-        {
-            // 閃爍效果
+        private void BlinkTimer_Tick(object sender, EventArgs e) {
             BgImage.Visibility = BgImage.Visibility == Visibility.Visible ? Visibility.Hidden : Visibility.Visible;
         }
 
-        protected override void OnClosed(EventArgs e)
-        {
+        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) {
+            if (e.ButtonState == MouseButtonState.Pressed)
+            {
+                this.DragMove();
+                OnLocationChanged?.Invoke(this.timerName, (int)this.Left, (int)this.Top);
+            }
+        }
+
+        private void Window_MouseRightButtonDown(object sender, MouseButtonEventArgs e) {
+            this.Close();
+        }
+
+        protected override void OnClosed(EventArgs e) {
             if (countdownTimer != null) countdownTimer.Stop();
             if (blinkTimer != null) blinkTimer.Stop();
             base.OnClosed(e);

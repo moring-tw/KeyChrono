@@ -1,18 +1,37 @@
-﻿<Window x:Class="CountdownApp.TimerWindow"
+﻿<Window x:Class="KeyChrono.TimerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" SizeToContent="WidthAndHeight"
-        ResizeMode="NoResize" WindowStartupLocation="Manual">
-    <Grid>
-        <!-- 更改 Stretch="Fill" 讓圖片可以依據指定的寬高自動縮放 -->
-        <Image x:Name="BgImage" Stretch="Fill" />
+        ResizeMode="NoResize" WindowStartupLocation="Manual"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        MouseRightButtonDown="Window_MouseRightButtonDown"
+        Cursor="SizeAll">
+    <Grid Background="Transparent">
+        <!-- 將畫面拆分為 3 個獨立的橫列 -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- 第 1 列: 放黑底名稱 -->
+            <RowDefinition Height="*"/>
+            <!-- 第 2 列: 放圖片與倒數時間 -->
+        </Grid.RowDefinitions>
 
-        <TextBlock x:Name="TimeText" Foreground="Red" FontSize="72" FontWeight="Bold"
-                   HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock.Effect>
-                <DropShadowEffect Color="Black" BlurRadius="5" ShadowDepth="2" />
-            </TextBlock.Effect>
-        </TextBlock>
+        <!-- 1. 計時器名稱 -->
+            <TextBlock Grid.Row="0" Background="Black" x:Name="NameText" Foreground="White" FontSize="20" FontWeight="Bold"
+                   HorizontalAlignment="Center" Margin="0,0,0,5">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="Black" BlurRadius="5" ShadowDepth="2" />
+                </TextBlock.Effect>
+            </TextBlock>
+        <Grid Grid.Row="1">
+            <Image x:Name="BgImage" Stretch="Fill" />
+            <TextBlock x:Name="TimeText" Foreground="Red" FontWeight="Bold"
+                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="Black" BlurRadius="0" ShadowDepth="5" />
+
+                </TextBlock.Effect>
+            </TextBlock>
+        </Grid>
     </Grid>
 </Window>
