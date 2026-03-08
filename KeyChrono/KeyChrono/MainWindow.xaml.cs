@@ -20,11 +20,12 @@ namespace KeyChrono
         // 低階鍵盤鉤子 (Low Level Keyboard Hook)
         // ==========================================
         private const int WH_KEYBOARD_LL = 13;
-        private const int WM_KEYDOWN = 0x0100; 
+        private const int WM_KEYDOWN = 0x0100;
         private const int WM_KEYUP = 0x0101;
 
         private static IntPtr hookId = IntPtr.Zero;
         private static LowLevelKeyboardProc? hookProc;
+
         // ==========================================
         // 目前修飾鍵狀態
         // ==========================================
@@ -33,19 +34,11 @@ namespace KeyChrono
         private bool isShiftDown = false;
         private bool isWinDown = false;
 
-        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam); [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId); [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk); [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam); [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr GetModuleHandle(string lpModuleName);
 
         // ==========================================
@@ -62,10 +55,21 @@ namespace KeyChrono
             public int Height { get; set; }
             public int FontSize { get; set; } = 72;
             public bool AutoRestart { get; set; }
+
+            // 0: Stop(停止), 1: Restart(重新計時), 2: Pause(暫停)
+            public int RetriggerAction { get; set; } = 0;
+
             public string ImagePath { get; set; } = string.Empty;
 
             [JsonIgnore] public string Coordinates => $"{X}, {Y}";
             [JsonIgnore] public string Dimensions => $"{Width}x{Height}";
+            [JsonIgnore]
+            public string RetriggerActionText => RetriggerAction switch
+            {
+                1 => "重置",
+                2 => "暫停",
+                _ => "停止"
+            };
         }
 
         private readonly ObservableCollection<TimerConfig> configs = new();
@@ -139,6 +143,7 @@ namespace KeyChrono
 
             return CallNextHookEx(hookId, nCode, wParam, lParam);
         }
+
         private static bool IsModifierKey(Key key) {
             return key is Key.LeftCtrl or Key.RightCtrl or
                           Key.LeftAlt or Key.RightAlt or
@@ -146,20 +151,18 @@ namespace KeyChrono
                           Key.LWin or Key.RWin;
         }
 
-
         // ==========================================
         // 按鍵處理核心邏輯
         // ==========================================
         private void HandleKeyPress(Key key) {
             string hotkeyString = GenerateHotkeyString(key);
+
             // 特殊處理：按 ESC 鍵（不論是否有其他修飾鍵） → 關閉全部
             if (hotkeyString == "shift+escape")
             {
                 CloseAllTimers();
                 return;
             }
-
-            // 根據目前按下的修飾鍵 + 主鍵，產生快捷鍵字串
 
             // 找出所有 HotkeyStr 符合的計時器設定（不分大小寫）
             var matchedConfigs = configs
@@ -171,11 +174,7 @@ namespace KeyChrono
                 TriggerTimer(config);
             }
         }
-        /// <summary>
-        /// 根據目前修飾鍵狀態與主鍵，產生標準格式的快捷鍵字串
-        /// 格式範例： "ctrl+alt+k"、"shift+f5"、"win+space"、"f12"
-        /// 順序固定：ctrl → alt → shift → win → 主鍵（全小寫）
-        /// </summary>
+
         private string GenerateHotkeyString(Key mainKey) {
             var segments = new List<string>();
 
@@ -186,7 +185,6 @@ namespace KeyChrono
 
             string keyName = mainKey.ToString().ToLowerInvariant();
 
-            // 常見按鍵名稱優化（可依需求增加）
             keyName = keyName switch
             {
                 "return" => "enter",
@@ -205,9 +203,9 @@ namespace KeyChrono
             };
 
             segments.Add(keyName);
-
             return string.Join("+", segments);
         }
+
         protected override void OnClosed(EventArgs e) {
             if (hookId != IntPtr.Zero)
             {
@@ -215,7 +213,6 @@ namespace KeyChrono
                 hookId = IntPtr.Zero;
             }
 
-            // 關閉所有計時器視窗
             foreach (var timer in activeTimers.Values.ToList())
             {
                 timer.Close();
@@ -225,22 +222,39 @@ namespace KeyChrono
             base.OnClosed(e);
         }
 
+        // ==========================================
+        // 計時器觸發與狀態機判斷
+        // ==========================================
         private void TriggerTimer(TimerConfig config) {
             string name = config.Name;
 
             if (activeTimers.TryGetValue(name, out var existingTimer))
             {
-                existingTimer.ToggleTimer();
+                if (existingTimer.IsRunning)
+                {
+                    // 執行中被按下，依照設定檔決定行為
+                    if (config.RetriggerAction == 1) existingTimer.ResetAndStart(); // 1: 重新計時
+                    else if (config.RetriggerAction == 2) existingTimer.Pause();         // 2: 暫停
+                    else existingTimer.StopAndReset();  // 0: 停止 (預設)
+                } else
+                {
+                    // 若沒有在執行，判斷是「暫停中」還是「已停止/歸零」
+                    // 如果剩餘時間大於 0 且小於初始時間，代表它是被暫停的，此時按下應「恢復計時」
+                    if (existingTimer.TimeLeft > 0 && existingTimer.TimeLeft < existingTimer.InitialDuration)
+                    {
+                        existingTimer.Resume();
+                    } else
+                    {
+                        // 否則就當作全新啟動
+                        existingTimer.ResetAndStart();
+                    }
+                }
             } else
             {
                 var timerWindow = new TimerWindow(
-                    name,
-                    config.Duration,
-                    config.ImagePath,
-                    config.X, config.Y,
-                    config.Width, config.Height,
-                    config.FontSize,
-                    config.AutoRestart);
+                    name, config.Duration, config.ImagePath,
+                    config.X, config.Y, config.Width, config.Height,
+                    config.FontSize, config.AutoRestart);
 
                 timerWindow.OnLocationChanged = (timerName, newX, newY) =>
                 {
@@ -255,7 +269,6 @@ namespace KeyChrono
                 };
 
                 timerWindow.Closed += (_, _) => activeTimers.Remove(name);
-
                 timerWindow.Show();
                 activeTimers[name] = timerWindow;
             }
@@ -310,6 +323,7 @@ namespace KeyChrono
                     foreach (var c in loaded)
                     {
                         if (c.FontSize <= 0) c.FontSize = 72;
+                        // 若為舊設定檔讀入的資料，預設 RetriggerAction 為 0 (停止)，相容舊行為
                         configs.Add(c);
                     }
                 }
@@ -324,15 +338,8 @@ namespace KeyChrono
         // UI 事件處理
         // ==========================================
         private void BrowseImage_Click(object sender, RoutedEventArgs e) {
-            var dlg = new OpenFileDialog
-            {
-                Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp"
-            };
-
-            if (dlg.ShowDialog() == true)
-            {
-                ImageInput.Text = dlg.FileName;
-            }
+            var dlg = new OpenFileDialog { Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp" };
+            if (dlg.ShowDialog() == true) ImageInput.Text = dlg.FileName;
         }
 
         private void AddTimer_Click(object sender, RoutedEventArgs e) {
@@ -357,12 +364,21 @@ namespace KeyChrono
                 return;
             }
 
-            // 移除舊的同名項目（如果存在）
+            // 解析單選按鈕設定
+            int action = 0; // 0: 停止 (預設)
+            if (ActionRestart.IsChecked == true) action = 1; // 1: 重新計時
+            if (ActionPause.IsChecked == true) action = 2;   // 2: 暫停
+
             var existing = configs.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
             if (existing != null)
             {
                 configs.Remove(existing);
-                activeTimers.Remove(name); // 也關閉正在執行的視窗（可選）
+                // 更新時也自動關閉舊視窗
+                if (activeTimers.TryGetValue(name, out var tw))
+                {
+                    tw.Close();
+                    activeTimers.Remove(name);
+                }
             }
 
             var newConfig = new TimerConfig
@@ -376,6 +392,7 @@ namespace KeyChrono
                 Height = h,
                 FontSize = fontSize,
                 AutoRestart = AutoRestartCheck.IsChecked == true,
+                RetriggerAction = action,
                 ImagePath = imgPath
             };
 
@@ -411,6 +428,11 @@ namespace KeyChrono
                 HeightInput.Text = cfg.Height.ToString();
                 FontSizeInput.Text = cfg.FontSize.ToString();
                 AutoRestartCheck.IsChecked = cfg.AutoRestart;
+
+                // 根據設定還原單選按鈕狀態
+                if (cfg.RetriggerAction == 1) ActionRestart.IsChecked = true;
+                else if (cfg.RetriggerAction == 2) ActionPause.IsChecked = true;
+                else ActionStop.IsChecked = true;
             }
         }
     }

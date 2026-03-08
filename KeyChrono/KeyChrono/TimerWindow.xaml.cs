@@ -16,9 +16,13 @@ namespace KeyChrono
         private DispatcherTimer blinkTimer;
         private bool isRunning;
 
-        public Action<string, int, int> OnLocationChanged;
+        public Action<string, int, int>? OnLocationChanged;
 
-        // 新增接收 fontSize 參數
+        // 公開狀態供主視窗判斷
+        public int TimeLeft => timeLeft;
+        public int InitialDuration => initialDuration;
+        public bool IsRunning => isRunning;
+
         public TimerWindow(string timerName, int duration, string imagePath, int x, int y, int imgWidth, int imgHeight, int fontSize, bool autoRestart) {
             InitializeComponent();
             this.timerName = timerName;
@@ -27,8 +31,6 @@ namespace KeyChrono
             this.autoRestart = autoRestart;
 
             NameText.Text = timerName;
-
-            // 套用主畫面設定的字體大小
             TimeText.FontSize = fontSize;
 
             this.Topmost = true;
@@ -48,8 +50,6 @@ namespace KeyChrono
                 MessageBox.Show("圖片載入失敗: " + ex.Message);
             }
 
-            TimeText.Text = timeLeft.ToString();
-
             countdownTimer = new DispatcherTimer();
             countdownTimer.Interval = TimeSpan.FromSeconds(1);
             countdownTimer.Tick += CountdownTimer_Tick;
@@ -58,18 +58,22 @@ namespace KeyChrono
             blinkTimer.Interval = TimeSpan.FromMilliseconds(300);
             blinkTimer.Tick += BlinkTimer_Tick;
 
-            StartTimer();
+            ResetAndStart();
         }
 
-        public void StartTimer() {
+        public void ResetAndStart() {
             timeLeft = initialDuration;
             TimeText.Text = timeLeft.ToString();
+
+            // 【修復 BUG】：強制停止閃爍計時器，並確保圖片為顯示狀態
+            blinkTimer.Stop();
             BgImage.Visibility = Visibility.Visible;
+
             countdownTimer.Start();
             isRunning = true;
         }
 
-        public void StopAndResetTimer() {
+        public void StopAndReset() {
             countdownTimer.Stop();
             blinkTimer.Stop();
             BgImage.Visibility = Visibility.Visible;
@@ -78,20 +82,26 @@ namespace KeyChrono
             isRunning = false;
         }
 
-        public void ToggleTimer() {
-            if (isRunning) StopAndResetTimer();
-            else StartTimer();
+        public void Pause() {
+            countdownTimer.Stop();
+            blinkTimer.Stop();
+            BgImage.Visibility = Visibility.Visible;
+            isRunning = false;
+            // 暫停時畫面保留目前的 timeLeft 數字
+        }
+
+        public void Resume() {
+            TimeText.Text = timeLeft.ToString();
+            BgImage.Visibility = Visibility.Visible;
+            countdownTimer.Start();
+            isRunning = true;
+
+            // 如果恢復時已經小於等於 5 秒，直接啟動閃爍
+            if (timeLeft <= 5) blinkTimer.Start();
         }
 
         private void CountdownTimer_Tick(object sender, EventArgs e) {
             timeLeft--;
-            if(countdownTimer.IsEnabled == false)
-            {
-                TimeText.Text = "STOP";
-                blinkTimer.Stop();
-                isRunning = false;
-                return;
-            }
 
             if (timeLeft > 0)
             {
