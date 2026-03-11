@@ -1,95 +1,104 @@
 ﻿<Window x:Class="KeyChrono.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="KeyChrono - 多重倒數計時器" Height="600" Width="780">
-    <Grid Margin="15">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <!-- 新增: RadioButton 放這裡 -->
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        Title="KeyChrono - 多重倒數計時器" Height="620" Width="780">
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,5">
-            <TextBlock Text="1. 計時器名稱:" Width="130" VerticalAlignment="Center" FontWeight="Bold"/>
-            <TextBox x:Name="NameInput" Width="150" VerticalContentAlignment="Center"/>
-            <TextBlock Text="(作為唯一識別碼)" Foreground="Gray" VerticalAlignment="Center" Margin="10,0,0,0"/>
-        </StackPanel>
+    <!-- 使用 DockPanel 包裝，讓 Menu 停靠在最上方 -->
+    <DockPanel>
+        <!-- 頂部選單列 -->
+        <Menu DockPanel.Dock="Top" Background="#F0F0F0" Padding="3">
+            <MenuItem Header="工具 (_T)">
+                <MenuItem Header="ElevenLabs 語音生成 (TTS)..." Click="OpenTTSWindow_Click"/>
+            </MenuItem>
+        </Menu>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,5">
-            <TextBlock Text="2. 倒數時間(秒):" Width="130" VerticalAlignment="Center"/>
-            <TextBox x:Name="TimeInput" Width="100" Text="10" VerticalContentAlignment="Center"/>
-        </StackPanel>
+        <!-- 原本的主畫面內容 (會自動填滿 Menu 下方的剩餘空間) -->
+        <Grid Margin="15">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,5">
-            <TextBlock Text="3. 圖片路徑:" Width="130" VerticalAlignment="Center"/>
-            <TextBox x:Name="ImageInput" Width="250" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
-            <Button Content="瀏覽..." Width="60" Click="BrowseImage_Click"/>
-        </StackPanel>
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="1. 計時器名稱:" Width="130" VerticalAlignment="Center" FontWeight="Bold"/>
+                <TextBox x:Name="NameInput" Width="150" VerticalContentAlignment="Center"/>
+                <TextBlock Text="(作為唯一識別碼)" Foreground="Gray" VerticalAlignment="Center" Margin="10,0,0,0"/>
+            </StackPanel>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,5">
-            <TextBlock Text="4. 畫面顯示座標:" Width="130" VerticalAlignment="Center"/>
-            <TextBlock Text="X:" VerticalAlignment="Center"/>
-            <TextBox x:Name="XInput" Width="50" Margin="5,0,15,0" Text="0" VerticalContentAlignment="Center"/>
-            <TextBlock Text="Y:" VerticalAlignment="Center"/>
-            <TextBox x:Name="YInput" Width="50" Margin="5,0,0,0" Text="0" VerticalContentAlignment="Center"/>
-        </StackPanel>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="2. 倒數時間(秒):" Width="130" VerticalAlignment="Center"/>
+                <TextBox x:Name="TimeInput" Width="100" Text="10" VerticalContentAlignment="Center"/>
+            </StackPanel>
 
-        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,5">
-            <TextBlock Text="5. 快捷鍵:" Width="130" VerticalAlignment="Center"/>
-            <TextBox x:Name="HotkeyInput" Width="150" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
-            <TextBlock Text="(多個計時器可共用相同快捷鍵)" Foreground="Gray" VerticalAlignment="Center"/>
-        </StackPanel>
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="3. 圖片路徑:" Width="130" VerticalAlignment="Center"/>
+                <TextBox x:Name="ImageInput" Width="250" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
+                <Button Content="瀏覽..." Width="60" Click="BrowseImage_Click"/>
+            </StackPanel>
 
-        <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,5">
-            <TextBlock Text="6. 畫面顯示尺寸:" Width="130" VerticalAlignment="Center"/>
-            <TextBlock Text="圖寬:" VerticalAlignment="Center"/>
-            <TextBox x:Name="WidthInput" Width="45" Margin="5,0,5,0" Text="200" VerticalContentAlignment="Center"/>
-            <TextBlock Text="圖高:" VerticalAlignment="Center"/>
-            <TextBox x:Name="HeightInput" Width="45" Margin="5,0,15,0" Text="200" VerticalContentAlignment="Center"/>
-            <TextBlock Text="字體大小:" VerticalAlignment="Center" FontWeight="Bold" Foreground="DarkBlue"/>
-            <TextBox x:Name="FontSizeInput" Width="45" Margin="5,0,0,0" Text="72" VerticalContentAlignment="Center"/>
-        </StackPanel>
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="4. 畫面顯示座標:" Width="130" VerticalAlignment="Center"/>
+                <TextBlock Text="X:" VerticalAlignment="Center"/>
+                <TextBox x:Name="XInput" Width="50" Margin="5,0,15,0" Text="0" VerticalContentAlignment="Center"/>
+                <TextBlock Text="Y:" VerticalAlignment="Center"/>
+                <TextBox x:Name="YInput" Width="50" Margin="5,0,0,0" Text="0" VerticalContentAlignment="Center"/>
+            </StackPanel>
 
-        <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,5">
-            <TextBlock Text="7. 自動重新計時:" Width="130" VerticalAlignment="Center"/>
-            <CheckBox x:Name="AutoRestartCheck" Content="倒數完畢後自動重啟" VerticalAlignment="Center"/>
-        </StackPanel>
+            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="5. 快捷鍵:" Width="130" VerticalAlignment="Center"/>
+                <TextBox x:Name="HotkeyInput" Width="150" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
+                <TextBlock Text="(多個計時器可共用相同快捷鍵)" Foreground="Gray" VerticalAlignment="Center"/>
+            </StackPanel>
 
-        <!-- 新增：設定執行中按下快捷鍵的行為 -->
-        <StackPanel Grid.Row="7" Orientation="Horizontal" Margin="0,5">
-            <TextBlock Text="8. 執行中按快捷鍵:" Width="130" VerticalAlignment="Center" Foreground="DarkRed" FontWeight="Bold"/>
-            <RadioButton x:Name="ActionRestart" Content="重新計時" VerticalAlignment="Center" Margin="0,0,15,0"/>
-            <RadioButton x:Name="ActionStop" Content="停止 (顯示STOP)" IsChecked="True" VerticalAlignment="Center" Margin="0,0,15,0"/>
-            <RadioButton x:Name="ActionPause" Content="暫停 (保留時間)" VerticalAlignment="Center"/>
-        </StackPanel>
+            <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="6. 畫面顯示尺寸:" Width="130" VerticalAlignment="Center"/>
+                <TextBlock Text="圖寬:" VerticalAlignment="Center"/>
+                <TextBox x:Name="WidthInput" Width="45" Margin="5,0,5,0" Text="200" VerticalContentAlignment="Center"/>
+                <TextBlock Text="圖高:" VerticalAlignment="Center"/>
+                <TextBox x:Name="HeightInput" Width="45" Margin="5,0,15,0" Text="200" VerticalContentAlignment="Center"/>
+                <TextBlock Text="字體大小:" VerticalAlignment="Center" FontWeight="Bold" Foreground="DarkBlue"/>
+                <TextBox x:Name="FontSizeInput" Width="45" Margin="5,0,0,0" Text="72" VerticalContentAlignment="Center"/>
+            </StackPanel>
 
-        <StackPanel Grid.Row="8" Orientation="Horizontal" Margin="0,15,0,10">
-            <Button Content="新增 / 更新計時器" Width="130" Margin="130,0,15,0" Click="AddTimer_Click" Padding="5"/>
-            <Button Content="刪除選取的計時器" Width="130" Click="DeleteTimer_Click" Padding="5" Foreground="DarkRed"/>
-        </StackPanel>
+            <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="7. 自動重新計時:" Width="130" VerticalAlignment="Center"/>
+                <CheckBox x:Name="AutoRestartCheck" Content="倒數完畢後自動重啟" VerticalAlignment="Center"/>
+            </StackPanel>
 
-        <DataGrid Grid.Row="9" x:Name="TimerList" AutoGenerateColumns="False" IsReadOnly="True" 
-                  HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="TimerList_SelectionChanged">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="名稱" Binding="{Binding Name}" Width="80"/>
-                <DataGridTextColumn Header="快捷鍵" Binding="{Binding HotkeyStr}" Width="65"/>
-                <!-- 新增：重複觸發狀態顯示 -->
-                <DataGridTextColumn Header="重複觸發" Binding="{Binding RetriggerActionText}" Width="65"/>
-                <DataGridTextColumn Header="時間" Binding="{Binding Duration}" Width="45"/>
-                <DataGridTextColumn Header="X, Y" Binding="{Binding Coordinates}" Width="65"/>
-                <DataGridTextColumn Header="圖片尺寸" Binding="{Binding Dimensions}" Width="65"/>
-                <DataGridTextColumn Header="字體" Binding="{Binding FontSize}" Width="45"/>
-                <DataGridCheckBoxColumn Header="重計" Binding="{Binding AutoRestart}" Width="45"/>
-                <DataGridTextColumn Header="圖片路徑" Binding="{Binding ImagePath}" Width="*"/>
-            </DataGrid.Columns>
-        </DataGrid>
-    </Grid>
+            <StackPanel Grid.Row="7" Orientation="Horizontal" Margin="0,5">
+                <TextBlock Text="8. 執行中按快捷鍵:" Width="130" VerticalAlignment="Center" Foreground="DarkRed" FontWeight="Bold"/>
+                <RadioButton x:Name="ActionRestart" Content="重新計時" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                <RadioButton x:Name="ActionStop" Content="停止 (顯示STOP)" IsChecked="True" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                <RadioButton x:Name="ActionPause" Content="暫停 (保留時間)" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <StackPanel Grid.Row="8" Orientation="Horizontal" Margin="0,15,0,10">
+                <Button Content="新增 / 更新計時器" Width="130" Margin="130,0,15,0" Click="AddTimer_Click" Padding="5"/>
+                <Button Content="刪除選取的計時器" Width="130" Click="DeleteTimer_Click" Padding="5" Foreground="DarkRed"/>
+            </StackPanel>
+
+            <DataGrid Grid.Row="9" x:Name="TimerList" AutoGenerateColumns="False" IsReadOnly="True" 
+                      HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="TimerList_SelectionChanged">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="名稱" Binding="{Binding Name}" Width="80"/>
+                    <DataGridTextColumn Header="快捷鍵" Binding="{Binding HotkeyStr}" Width="65"/>
+                    <DataGridTextColumn Header="重複觸發" Binding="{Binding RetriggerActionText}" Width="65"/>
+                    <DataGridTextColumn Header="時間" Binding="{Binding Duration}" Width="45"/>
+                    <DataGridTextColumn Header="X, Y" Binding="{Binding Coordinates}" Width="65"/>
+                    <DataGridTextColumn Header="圖片尺寸" Binding="{Binding Dimensions}" Width="65"/>
+                    <DataGridTextColumn Header="字體" Binding="{Binding FontSize}" Width="45"/>
+                    <DataGridCheckBoxColumn Header="重計" Binding="{Binding AutoRestart}" Width="45"/>
+                    <DataGridTextColumn Header="圖片路徑" Binding="{Binding ImagePath}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </DockPanel>
 </Window>
