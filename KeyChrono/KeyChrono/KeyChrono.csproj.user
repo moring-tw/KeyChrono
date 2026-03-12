@@ -12,12 +12,18 @@
     <Compile Update="ElevenLabsWindow.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="HowToApplyElevenLabs_TTS_API_Key.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="TimerWindow.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>
   <ItemGroup>
     <Page Update="ElevenLabsWindow.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="HowToApplyElevenLabs_TTS_API_Key.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Update="MainWindow.xaml">

@@ -1,31 +1,55 @@
 ﻿<Window x:Class="KeyChrono.ElevenLabsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="ElevenLabs 語音生成工具" Height="450" Width="500" WindowStartupLocation="CenterScreen">
+        Title="ElevenLabs 語音生成工具" Height="520" Width="500" WindowStartupLocation="CenterScreen">
     <Grid Margin="15">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <!-- 0: API Key -->
+            <RowDefinition Height="Auto"/>
+            <!-- 1: 語音選擇 -->
             <RowDefinition Height="*"/>
+            <!-- 2: 文字內容 -->
             <RowDefinition Height="Auto"/>
+            <!-- 3: 儲存路徑 -->
             <RowDefinition Height="Auto"/>
+            <!-- 4: 執行按鈕 -->
             <RowDefinition Height="Auto"/>
+            <!-- 5: 狀態顯示 -->
         </Grid.RowDefinitions>
 
-        <!-- API Key 輸入區 -->
+        <!-- API Key 輸入區 (保留你的修改) -->
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="ElevenLabs API Key:" FontWeight="Bold" Margin="0,0,0,5"/>
             <TextBox x:Name="ApiKeyInput" Height="25" VerticalContentAlignment="Center" Padding="5,0"/>
+            <Button Content="[?] 教學: 如何取得 API Key" Margin="0,0,0,0" Padding="8,2" 
+                    Background="#E3F2FD" BorderBrush="#90CAF9" Foreground="#0D47A1" 
+                    Cursor="Hand" Click="OpenApiKeyTutorial_Click"/>
+        </StackPanel>
+
+        <!-- 新增：語音選擇區 -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,10">
+            <TextBlock Text="選擇語音 (Voice ID):" FontWeight="Bold" Margin="0,0,0,5"/>
+            <StackPanel Orientation="Horizontal">
+                <RadioButton x:Name="VoiceFemale" Content="女聲" IsChecked="True" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                <RadioButton x:Name="VoiceMale" Content="男聲" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                <RadioButton x:Name="VoiceCustom" Content="自訂:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+
+                <!-- 透過 ElementName 綁定，只有選中自訂時才會啟用此輸入框 -->
+                <TextBox x:Name="CustomVoiceIdInput" Width="180" Height="25" VerticalContentAlignment="Center" Padding="5,0"
+                         IsEnabled="{Binding IsChecked, ElementName=VoiceCustom}" />
+            </StackPanel>
         </StackPanel>
 
         <!-- 文字輸入區 -->
-        <StackPanel Grid.Row="1" Margin="0,0,0,10">
+        <StackPanel Grid.Row="2" Margin="0,0,0,10">
             <TextBlock Text="要生成的文字內容 (支援中文):" FontWeight="Bold" Margin="0,0,0,5"/>
             <TextBox x:Name="TextInput" AcceptsReturn="True" TextWrapping="Wrap" 
                      VerticalScrollBarVisibility="Auto" Height="150" Padding="5"/>
         </StackPanel>
 
         <!-- 儲存路徑區 -->
-        <StackPanel Grid.Row="2" Margin="0,0,0,15">
+        <StackPanel Grid.Row="3" Margin="0,0,0,15">
             <TextBlock Text="儲存音檔路徑 (*.mp3):" FontWeight="Bold" Margin="0,0,0,5"/>
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -38,10 +62,10 @@
         </StackPanel>
 
         <!-- 執行按鈕 -->
-        <Button Grid.Row="3" x:Name="GenerateButton" Content="生成語音 (Generate)" Height="40" 
+        <Button Grid.Row="4" x:Name="GenerateButton" Content="生成語音 (Generate)" Height="40" 
                 FontWeight="Bold" Background="#4CAF50" Foreground="White" FontSize="14" Click="Generate_Click"/>
 
         <!-- 狀態顯示 -->
-        <TextBlock Grid.Row="4" x:Name="StatusText" Margin="0,10,0,0" Foreground="Gray" TextWrapping="Wrap" FontWeight="SemiBold"/>
+        <TextBlock Grid.Row="5" x:Name="StatusText" Margin="0,10,0,0" Foreground="Gray" TextWrapping="Wrap" FontWeight="SemiBold"/>
     </Grid>
 </Window>

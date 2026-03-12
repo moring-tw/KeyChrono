@@ -1,0 +1,35 @@
+﻿<Window x:Class="KeyChrono.HowToApplyElevenLabs_TTS_API_Key"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="如何取得 ElevenLabs API Key" Height="360" Width="480" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <Border Padding="20">
+        <StackPanel>
+            <TextBlock Text="取得 API Key 操作步驟" FontSize="18" FontWeight="Bold" Margin="0,0,0,15" Foreground="#333"/>
+
+            <!-- 文字說明區塊 -->
+            <TextBlock TextWrapping="Wrap" LineHeight="24" FontSize="14">
+                <Run Text="1. 點擊："/>
+                <Hyperlink NavigateUri="https://try.elevenlabs.io/f304cb3n3bbi" RequestNavigate="Hyperlink_RequestNavigate">
+                    連結前往 ElevenLabs 官網
+                </Hyperlink>
+                <Run Text=" 並註冊 / 登入帳號。"/>
+                <LineBreak/>
+                <Run Text="2. 登入後，點擊網頁左上角的「下拉式選單」。"/>
+                <LineBreak/>
+                <Run Text="3. 在彈出的選單中選擇「ElevenAPI」。"/>
+                <LineBreak/>
+                <Run Text="4. 找到 API Key 欄位，點擊後找到右側的「創建密鑰」。"/>
+                <LineBreak/>
+                <Run Text="5. 輸入名稱，並開啟下方文字轉語音的權限。"/>
+                <LineBreak/>
+                <Run Text="6. 將複製的一長串代碼貼回本軟體的 API Key 欄位中即可完成！"/>
+                <LineBreak/>
+                <LineBreak/>
+                <Run Text="⚠️ 注意：API 密鑰只會顯示一次，請保存好且不要提供給第三方。" Foreground="Red" FontWeight="Bold"/>
+            </TextBlock>
+
+            <!-- 關閉按鈕 -->
+            <Button Content="我知道了" Width="100" Height="30" Margin="0,20,0,0" Click="CloseButton_Click" Background="#2196F3" Foreground="White" FontWeight="Bold"/>
+        </StackPanel>
+    </Border>
+</Window>

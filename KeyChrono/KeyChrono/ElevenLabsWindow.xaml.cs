@@ -12,13 +12,22 @@ namespace KeyChrono
 {
     public partial class ElevenLabsWindow : Window
     {
-        // 預設寫死的參數
-        private const string VoiceId = "x3ktUIG7gge4IhocTKbc"; // Rachel 聲音模型
-        private const string ModelId = "eleven_multilingual_v2"; // v2 支援多國語言(含中文)
+        // 模型依舊寫死為 v2 以支援中文
+        private const string ModelId = "eleven_multilingual_v2";
 
         public ElevenLabsWindow()
         {
             InitializeComponent();
+        }
+
+        // 開啟教學頁面
+        private void OpenApiKeyTutorial_Click(object sender, RoutedEventArgs e)
+        {
+            var tutorialWindow = new HowToApplyElevenLabs_TTS_API_Key
+            {
+                Owner = this
+            };
+            tutorialWindow.ShowDialog();
         }
 
         private void BrowseSavePath_Click(object sender, RoutedEventArgs e)
@@ -42,9 +51,40 @@ namespace KeyChrono
             string text = TextInput.Text.Trim();
             string savePath = SavePathInput.Text.Trim();
 
-            if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(text) || string.IsNullOrEmpty(savePath))
+            // 判斷要使用的 Voice ID
+            string voiceId = string.Empty;
+            if (VoiceFemale.IsChecked == true)
             {
-                MessageBox.Show("API Key、文字內容與儲存路徑均不得為空！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                voiceId = "x3ktUIG7gge4IhocTKbc";
+            }
+            else if (VoiceMale.IsChecked == true)
+            {
+                voiceId = "mwsfTAK3my23vP5QPPiC";
+            }
+            else if (VoiceCustom.IsChecked == true)
+            {
+                voiceId = CustomVoiceIdInput.Text.Trim();
+            }
+
+            // 防呆驗證
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                MessageBox.Show("請輸入 API Key！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (string.IsNullOrEmpty(voiceId))
+            {
+                MessageBox.Show("請選擇或輸入語音 ID！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (string.IsNullOrEmpty(text))
+            {
+                MessageBox.Show("請輸入要生成的文字！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (string.IsNullOrEmpty(savePath))
+            {
+                MessageBox.Show("請選擇儲存路徑！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -54,7 +94,8 @@ namespace KeyChrono
 
             try
             {
-                await CallElevenLabsApiAsync(apiKey, text, savePath);
+                // 將 voiceId 傳入 API 請求
+                await CallElevenLabsApiAsync(apiKey, voiceId, text, savePath);
 
                 StatusText.Text = $"✅ 成功！音檔已儲存至:\n{savePath}";
                 StatusText.Foreground = Brushes.Green;
@@ -70,9 +111,10 @@ namespace KeyChrono
             }
         }
 
-        private async Task CallElevenLabsApiAsync(string apiKey, string text, string savePath)
+        // 新增 voiceId 參數
+        private async Task CallElevenLabsApiAsync(string apiKey, string voiceId, string text, string savePath)
         {
-            string endpoint = $"https://api.elevenlabs.io/v1/text-to-speech/{VoiceId}";
+            string endpoint = $"https://api.elevenlabs.io/v1/text-to-speech/{voiceId}";
 
             var payload = new
             {
@@ -83,13 +125,11 @@ namespace KeyChrono
 
             using (HttpClient client = new HttpClient())
             {
-                // 設定 API Headers
                 client.DefaultRequestHeaders.Add("xi-api-key", apiKey);
                 client.DefaultRequestHeaders.Add("Accept", "audio/mpeg");
 
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-                // 發送 POST 請求
                 using (HttpResponseMessage response = await client.PostAsync(endpoint, content))
                 {
                     if (!response.IsSuccessStatusCode)
@@ -98,7 +138,6 @@ namespace KeyChrono
                         throw new Exception($"API 請求失敗 ({response.StatusCode}): {errorDetail}");
                     }
 
-                    // 取得二進位音檔資料並直接寫入磁碟 (超簡化寫法)
                     var audioData = await response.Content.ReadAsByteArrayAsync();
                     await File.WriteAllBytesAsync(savePath, audioData);
                 }
