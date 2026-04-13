@@ -24,7 +24,11 @@
                 </TextBlock.Effect>
             </TextBlock>
         <Grid Grid.Row="1">
-            <Image x:Name="BgImage" Stretch="Fill" />
+            <!-- 背景容器：預設灰白底。如果有圖片會在 C# 將其改為透明並顯示 Image -->
+            <Grid x:Name="BackgroundContainer" Background="#F0F0F0">
+                <Image x:Name="BgImage" Stretch="Fill" Visibility="Collapsed" />
+            </Grid>
+
             <TextBlock x:Name="TimeText" Foreground="Red" FontWeight="Bold"
                        HorizontalAlignment="Center" VerticalAlignment="Center">
                 <TextBlock.Effect>

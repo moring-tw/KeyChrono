@@ -10,13 +10,14 @@ using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace KeyChrono
 {
     public partial class MainWindow : Window
     {
         // ==========================================
-        // 低階鍵盤鉤子 (Low Level Keyboard Hook)
+        // 低階鍵盤鉤子
         // ==========================================
         private const int WH_KEYBOARD_LL = 13;
         private const int WM_KEYDOWN = 0x0100;
@@ -30,9 +31,7 @@ namespace KeyChrono
         private bool isShiftDown = false;
         private bool isWinDown = false;
 
-        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam); [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId); [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool UnhookWindowsHookEx(IntPtr hhk); [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
@@ -40,7 +39,7 @@ namespace KeyChrono
         private static extern IntPtr GetModuleHandle(string lpModuleName);
 
         // ==========================================
-        // 資料模型
+        // 資料模型與全域狀態
         // ==========================================
         public class TimerConfig
         {
@@ -55,29 +54,30 @@ namespace KeyChrono
             public bool AutoRestart { get; set; }
             public int RetriggerAction { get; set; } = 0;
             public string ImagePath { get; set; } = string.Empty;
-
-            // 新增：警示設定參數
             public int BlinkTime { get; set; } = 10;
             public string AudioPath { get; set; } = string.Empty;
             public int AudioTime { get; set; } = 10;
 
             [JsonIgnore] public string Coordinates => $"{X}, {Y}";
             [JsonIgnore] public string Dimensions => $"{Width}x{Height}";
-            [JsonIgnore]
-            public string RetriggerActionText => RetriggerAction switch
-            {
-                1 => "重置",
-                2 => "暫停",
-                _ => "停止"
-            };
+            [JsonIgnore] public string RetriggerActionText => RetriggerAction switch { 1 => "重置", 2 => "暫停", _ => "停止" };
+        }
+
+        public class GlobalSettings
+        {
+            public bool IsStatusWindowTopMost { get; set; } = true;
         }
 
         private readonly ObservableCollection<TimerConfig> configs = new();
         private readonly Dictionary<string, TimerWindow> activeTimers = new();
         private readonly string configFilePath;
+        private readonly string globalSettingsPath;
 
-        public MainWindow()
-        {
+        private StatusWindow statusWindow;
+        private GlobalSettings appSettings = new();
+        private bool isHotkeyEnabled = true;
+
+        public MainWindow() {
             InitializeComponent();
             SetDefaultCenterCoordinates();
 
@@ -85,45 +85,49 @@ namespace KeyChrono
             string appFolder = Path.Combine(appData, "KeyChrono");
             Directory.CreateDirectory(appFolder);
             configFilePath = Path.Combine(appFolder, "timers.json");
+            globalSettingsPath = Path.Combine(appFolder, "settings.json");
 
             TimerList.ItemsSource = configs;
             LoadConfigs();
+
+            // 初始化狀態懸浮窗
+            statusWindow = new StatusWindow();
+            statusWindow.Topmost = appSettings.IsStatusWindowTopMost;
+            StatusWindowTopMostCheck.IsChecked = appSettings.IsStatusWindowTopMost;
+
+            statusWindow.OnStatusChanged = (isEnabled) => {
+                isHotkeyEnabled = isEnabled;
+            };
+            statusWindow.Show();
         }
 
-        private void SetDefaultCenterCoordinates()
-        {
+        private void SetDefaultCenterCoordinates() {
             double screenWidth = SystemParameters.PrimaryScreenWidth;
             double screenHeight = SystemParameters.PrimaryScreenHeight;
-            int defaultWidth = 200;
-            int defaultHeight = 200;
-            XInput.Text = ((int)((screenWidth - defaultWidth) / 2)).ToString();
-            YInput.Text = ((int)((screenHeight - defaultHeight) / 2)).ToString();
+            XInput.Text = ((int)((screenWidth - 200) / 2)).ToString();
+            YInput.Text = ((int)((screenHeight - 200) / 2)).ToString();
         }
 
         // ==========================================
         // 鉤子設置與移除
         // ==========================================
-        protected override void OnSourceInitialized(EventArgs e)
-        {
+        protected override void OnSourceInitialized(EventArgs e) {
             base.OnSourceInitialized(e);
             hookProc = LowLevelKeyboardHookCallback;
             hookId = SetHook(hookProc);
         }
 
-        private static IntPtr SetHook(LowLevelKeyboardProc proc)
-        {
+        private static IntPtr SetHook(LowLevelKeyboardProc proc) {
             using var process = System.Diagnostics.Process.GetCurrentProcess();
             using var module = process.MainModule!;
             return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(module.ModuleName), 0);
         }
 
-        private IntPtr LowLevelKeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
-        {
+        private IntPtr LowLevelKeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam) {
             if (nCode < 0) return CallNextHookEx(hookId, nCode, wParam, lParam);
 
             int vkCode = Marshal.ReadInt32(lParam);
             Key key = KeyInterop.KeyFromVirtualKey(vkCode);
-
             bool keyDown = wParam == (IntPtr)WM_KEYDOWN;
 
             switch (key)
@@ -142,14 +146,20 @@ namespace KeyChrono
             return CallNextHookEx(hookId, nCode, wParam, lParam);
         }
 
-        private static bool IsModifierKey(Key key)
-        {
+        private static bool IsModifierKey(Key key) {
             return key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin;
         }
 
-        private void HandleKeyPress(Key key)
-        {
+        private void HandleKeyPress(Key key) {
             string hotkeyString = GenerateHotkeyString(key);
+
+            // 系統全域熱鍵 (不受 Toggle 影響)
+            if (hotkeyString == "shift+f1")
+            {
+                isHotkeyEnabled = !isHotkeyEnabled;
+                statusWindow.SetToggleState(isHotkeyEnabled);
+                return;
+            }
 
             if (hotkeyString == "shift+escape")
             {
@@ -157,12 +167,14 @@ namespace KeyChrono
                 return;
             }
 
+            // 【重點】：如果關閉監聽，則略過後續觸發
+            if (!isHotkeyEnabled) return;
+
             var matchedConfigs = configs.Where(c => string.Equals(c.HotkeyStr, hotkeyString, StringComparison.OrdinalIgnoreCase)).ToList();
             foreach (var config in matchedConfigs) TriggerTimer(config);
         }
 
-        private string GenerateHotkeyString(Key mainKey)
-        {
+        private string GenerateHotkeyString(Key mainKey) {
             var segments = new List<string>();
             if (isCtrlDown) segments.Add("ctrl");
             if (isAltDown) segments.Add("alt");
@@ -170,6 +182,13 @@ namespace KeyChrono
             if (isWinDown) segments.Add("win");
 
             string keyName = mainKey.ToString().ToLowerInvariant();
+
+            // 修正數字鍵 0-9 顯示為 D0-D9 的問題
+            if (mainKey >= Key.D0 && mainKey <= Key.D9)
+            {
+                keyName = keyName.Substring(1);
+            }
+
             keyName = keyName switch
             {
                 "return" => "enter",
@@ -190,21 +209,46 @@ namespace KeyChrono
             return string.Join("+", segments);
         }
 
-        protected override void OnClosed(EventArgs e)
-        {
+        public static (Key Key, ModifierKeys Modifiers) ParseHotkey(string str) {
+            var parts = str.Split('+');
+            ModifierKeys modifiers = 0;
+            Key key = Key.None;
+
+            foreach (var p in parts)
+            {
+                string pLower = p.Trim().ToLower();
+                switch (pLower)
+                {
+                    case "ctrl": case "control": modifiers |= ModifierKeys.Control; break;
+                    case "alt": modifiers |= ModifierKeys.Alt; break;
+                    case "shift": modifiers |= ModifierKeys.Shift; break;
+                    case "win": case "windows": modifiers |= ModifierKeys.Windows; break;
+                    default:
+                        string keyStr = p.Trim();
+                        // 修正反向解析數字鍵 0-9
+                        if (keyStr.Length == 1 && char.IsDigit(keyStr[0])) keyStr = "D" + keyStr;
+
+                        if (Enum.TryParse(typeof(Key), keyStr, true, out object parsedKey))
+                            key = (Key)parsedKey;
+                        break;
+                }
+            }
+            return (key, modifiers);
+        }
+
+        protected override void OnClosed(EventArgs e) {
             if (hookId != IntPtr.Zero)
             {
                 UnhookWindowsHookEx(hookId);
                 hookId = IntPtr.Zero;
             }
+            statusWindow?.Close();
             CloseAllTimers();
             base.OnClosed(e);
         }
 
-        private void TriggerTimer(TimerConfig config)
-        {
+        private void TriggerTimer(TimerConfig config) {
             string name = config.Name;
-
             if (activeTimers.TryGetValue(name, out var existingTimer))
             {
                 if (existingTimer.IsRunning)
@@ -212,49 +256,35 @@ namespace KeyChrono
                     if (config.RetriggerAction == 1) existingTimer.ResetAndStart();
                     else if (config.RetriggerAction == 2) existingTimer.Pause();
                     else existingTimer.StopAndReset();
-                }
-                else
+                } else
                 {
                     if (existingTimer.TimeLeft > 0 && existingTimer.TimeLeft < existingTimer.InitialDuration)
                         existingTimer.Resume();
-                    else
-                        existingTimer.ResetAndStart();
+                    else existingTimer.ResetAndStart();
                 }
-            }
-            else
+            } else
             {
-                // 將新增的 BlinkTime, AudioPath, AudioTime 傳遞給視窗
                 var timerWindow = new TimerWindow(
                     name, config.Duration, config.ImagePath,
-                    config.X, config.Y, config.Width, config.Height,
-                    config.FontSize, config.AutoRestart,
-                    config.BlinkTime, config.AudioPath, config.AudioTime);
+                    config.X, config.Y, config.Width, config.Height, config.FontSize,
+                    config.AutoRestart, config.BlinkTime, config.AudioPath, config.AudioTime);
 
-                timerWindow.OnLocationChanged = (timerName, newX, newY) =>
-                {
+                timerWindow.OnLocationChanged = (timerName, newX, newY) => {
                     var cfg = configs.FirstOrDefault(c => c.Name.Equals(timerName, StringComparison.OrdinalIgnoreCase));
-                    if (cfg != null)
-                    {
-                        cfg.X = newX; cfg.Y = newY;
-                        SaveConfigs();
-                        RefreshUIAfterConfigChange();
-                    }
+                    if (cfg != null) { cfg.X = newX; cfg.Y = newY; SaveConfigs(); RefreshUIAfterConfigChange(); }
                 };
-
                 timerWindow.Closed += (_, _) => activeTimers.Remove(name);
                 timerWindow.Show();
                 activeTimers[name] = timerWindow;
             }
         }
 
-        private void CloseAllTimers()
-        {
+        private void CloseAllTimers() {
             foreach (var timer in activeTimers.Values.ToList()) timer.Close();
             activeTimers.Clear();
         }
 
-        private void RefreshUIAfterConfigChange()
-        {
+        private void RefreshUIAfterConfigChange() {
             var selected = TimerList.SelectedItem;
             TimerList.Items.Refresh();
             TimerList.SelectedItem = selected;
@@ -266,54 +296,59 @@ namespace KeyChrono
             }
         }
 
-        private void SaveConfigs()
-        {
+        // ==========================================
+        // 存取設定檔
+        // ==========================================
+        private void SaveConfigs() {
             try
             {
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 File.WriteAllText(configFilePath, JsonSerializer.Serialize(configs, options));
+                File.WriteAllText(globalSettingsPath, JsonSerializer.Serialize(appSettings, options));
             }
-            catch (Exception ex) { MessageBox.Show($"儲存失敗：{ex.Message}", "錯誤", MessageBoxButton.OK, MessageBoxImage.Error); }
+            catch { }
         }
 
-        private void LoadConfigs()
-        {
-            if (!File.Exists(configFilePath)) return;
+        private void LoadConfigs() {
             try
             {
-                string json = File.ReadAllText(configFilePath);
-                var loaded = JsonSerializer.Deserialize<List<TimerConfig>>(json);
-                if (loaded != null)
+                if (File.Exists(globalSettingsPath))
                 {
-                    foreach (var c in loaded)
+                    var loadedSettings = JsonSerializer.Deserialize<GlobalSettings>(File.ReadAllText(globalSettingsPath));
+                    if (loadedSettings != null) appSettings = loadedSettings;
+                }
+
+                if (File.Exists(configFilePath))
+                {
+                    var loaded = JsonSerializer.Deserialize<List<TimerConfig>>(File.ReadAllText(configFilePath));
+                    if (loaded != null)
                     {
-                        if (c.FontSize <= 0) c.FontSize = 72;
-                        if (c.BlinkTime <= 0) c.BlinkTime = 10; // 相容舊檔設定閃爍為 10
-                        if (c.AudioTime <= 0) c.AudioTime = 10; // 相容舊檔設定音效時間為 10
-                        configs.Add(c);
+                        foreach (var c in loaded)
+                        {
+                            if (c.FontSize <= 0) c.FontSize = 72;
+                            if (c.BlinkTime <= 0) c.BlinkTime = 10;
+                            if (c.AudioTime <= 0) c.AudioTime = 10;
+                            configs.Add(c);
+                        }
                     }
                 }
             }
-            catch (Exception ex) { MessageBox.Show($"載入設定檔失敗：{ex.Message}", "錯誤", MessageBoxButton.OK, MessageBoxImage.Error); }
+            catch { }
         }
 
         // ==========================================
-        // UI 事件處理
+        // UI 操作事件
         // ==========================================
-        private void BrowseImage_Click(object sender, RoutedEventArgs e)
-        {
+        private void BrowseImage_Click(object sender, RoutedEventArgs e) {
             var dlg = new OpenFileDialog { Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp" };
             if (dlg.ShowDialog() == true) ImageInput.Text = dlg.FileName;
         }
 
-        private void BrowseAudio_Click(object sender, RoutedEventArgs e)
-        {
+        private void BrowseAudio_Click(object sender, RoutedEventArgs e) {
             var dlg = new OpenFileDialog { Filter = "Audio Files|*.mp3;*.wav;*.wma" };
             if (dlg.ShowDialog() == true) AudioPathInput.Text = dlg.FileName;
         }
-
-        private void AddTimer_Click(object sender, RoutedEventArgs e)
-        {
+        private void AddTimer_Click(object sender, RoutedEventArgs e) {
             if (!int.TryParse(TimeInput.Text, out int duration) ||
                 !int.TryParse(XInput.Text, out int x) ||
                 !int.TryParse(YInput.Text, out int y) ||
@@ -332,9 +367,9 @@ namespace KeyChrono
             string imgPath = ImageInput.Text.Trim();
             string audioPath = AudioPathInput.Text.Trim();
 
-            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(hotkey) || string.IsNullOrWhiteSpace(imgPath))
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(hotkey))
             {
-                MessageBox.Show("名稱、快捷鍵、圖片路徑 請務必填寫", "欄位不完整", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("名稱、快捷鍵請務必填寫", "欄位不完整", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -375,8 +410,7 @@ namespace KeyChrono
             MessageBox.Show($"已儲存計時器：{name}", "完成", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        private void DeleteTimer_Click(object sender, RoutedEventArgs e)
-        {
+        private void DeleteTimer_Click(object sender, RoutedEventArgs e) {
             if (TimerList.SelectedItem is not TimerConfig selected) return;
             if (activeTimers.TryGetValue(selected.Name, out var tw))
             {
@@ -387,8 +421,7 @@ namespace KeyChrono
             SaveConfigs();
         }
 
-        private void TimerList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
+        private void TimerList_SelectionChanged(object sender, SelectionChangedEventArgs e) {
             if (TimerList.SelectedItem is TimerConfig cfg)
             {
                 NameInput.Text = cfg.Name;
@@ -412,10 +445,88 @@ namespace KeyChrono
             }
         }
 
-        private void OpenTTSWindow_Click(object sender, RoutedEventArgs e)
-        {
+        private void OpenTTSWindow_Click(object sender, RoutedEventArgs e) {
             var ttsWindow = new ElevenLabsWindow { Owner = this };
             ttsWindow.Show();
+        }
+
+        // 全域設定變更
+        private void StatusWindowTopMost_Changed(object sender, RoutedEventArgs e) {
+            if (statusWindow != null && StatusWindowTopMostCheck.IsChecked.HasValue)
+            {
+                appSettings.IsStatusWindowTopMost = StatusWindowTopMostCheck.IsChecked.Value;
+                statusWindow.Topmost = appSettings.IsStatusWindowTopMost;
+                SaveConfigs();
+            }
+        }
+
+        // ==========================================
+        // 快捷鍵錄製邏輯
+        // ==========================================
+        private void HotkeyInput_GotFocus(object sender, RoutedEventArgs e) {
+            HotkeyInput.BorderBrush = Brushes.Red;
+            HotkeyInput.BorderThickness = new Thickness(2);
+            RecordingBorder.Visibility = Visibility.Visible;
+            RecordingHint.Visibility = Visibility.Collapsed;
+            HotkeyInput.Text = "";
+        }
+
+        private void HotkeyInput_LostFocus(object sender, RoutedEventArgs e) {
+            HotkeyInput.ClearValue(Border.BorderBrushProperty);
+            HotkeyInput.ClearValue(Border.BorderThicknessProperty);
+            RecordingBorder.Visibility = Visibility.Collapsed;
+            RecordingHint.Visibility = Visibility.Visible;
+        }
+
+        private void HotkeyInput_RightDown(object sender, MouseButtonEventArgs e) {
+            HotkeyInput.ClearValue(Border.BorderBrushProperty);
+            HotkeyInput.ClearValue(Border.BorderThicknessProperty);
+            RecordingBorder.Visibility = Visibility.Collapsed;
+            RecordingHint.Visibility = Visibility.Visible;
+        }
+
+        private void HotkeyInput_PreviewKeyDown(object sender, KeyEventArgs e) {
+            e.Handled = true; // 阻止預設輸入
+            Key key = (e.Key == Key.System ? e.SystemKey : e.Key);
+
+            // 如果只按下修飾鍵，繼續等待主鍵輸入
+            if (IsModifierKey(key)) return;
+
+            var modifiers = Keyboard.Modifiers;
+            var segments = new List<string>();
+
+            if (modifiers.HasFlag(ModifierKeys.Control)) segments.Add("ctrl");
+            if (modifiers.HasFlag(ModifierKeys.Alt)) segments.Add("alt");
+            if (modifiers.HasFlag(ModifierKeys.Shift)) segments.Add("shift");
+            if (modifiers.HasFlag(ModifierKeys.Windows)) segments.Add("win");
+
+            string keyName = key.ToString().ToLowerInvariant();
+            if (key >= Key.D0 && key <= Key.D9) keyName = keyName.Substring(1);
+
+            keyName = keyName switch
+            {
+            "return" => "enter",
+            "capital" => "capslock",
+            "oemcomma" => ",",
+            "oemperiod" => ".",
+            "oemminus" => "-",
+            "oemplus" => "+",
+            "oem6" => "]",
+            "oem4" => "[",
+                "oem5" => "\\",
+                "oem1" => ";",
+                "oem7" => "'",
+                "oem102" => "<",
+                _ => keyName
+            };
+
+            segments.Add(keyName);
+
+            // 將錄製結果顯示在 TextBox 上
+            HotkeyInput.Text = string.Join("+", segments);
+
+            // 錄製完畢後自動移除焦點，結束錄製狀態
+            Keyboard.ClearFocus();
         }
     }
 }

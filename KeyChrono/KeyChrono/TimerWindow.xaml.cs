@@ -31,15 +31,13 @@ namespace KeyChrono
         public int InitialDuration => initialDuration;
         public bool IsRunning => isRunning;
 
-        public TimerWindow(string timerName, int duration, string imagePath, int x, int y, int imgWidth, int imgHeight, int fontSize, bool autoRestart, int blinkTime, string audioPath, int audioTime)
-        {
+        public TimerWindow(string timerName, int duration, string imagePath, int x, int y, int imgWidth, int imgHeight, int fontSize, bool autoRestart, int blinkTime, string audioPath, int audioTime) {
             InitializeComponent();
             this.timerName = timerName;
             this.initialDuration = duration;
             this.timeLeft = duration;
             this.autoRestart = autoRestart;
 
-            // 賦值警示設定
             this.blinkTime = blinkTime;
             this.audioPath = audioPath;
             this.audioTime = audioTime;
@@ -51,20 +49,23 @@ namespace KeyChrono
             this.Left = x;
             this.Top = y;
 
-            BgImage.Width = imgWidth;
-            BgImage.Height = imgHeight;
+            // 設定背景容器尺寸
+            BackgroundContainer.Width = imgWidth;
+            BackgroundContainer.Height = imgHeight;
 
-            try
+            // 【修改點 2】：圖片與背景處理
+            if (!string.IsNullOrWhiteSpace(imagePath) && File.Exists(imagePath))
             {
-                BitmapImage bitmap = new BitmapImage(new Uri(imagePath, UriKind.Absolute));
-                BgImage.Source = bitmap;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("圖片載入失敗: " + ex.Message);
+                try
+                {
+                    BgImage.Source = new BitmapImage(new Uri(imagePath, UriKind.Absolute));
+                    BgImage.Visibility = Visibility.Visible;
+                    BackgroundContainer.Background = Brushes.Transparent; // 成功載入圖片，將底色變透明
+                }
+                catch { }
             }
 
-            // 若有設定音效路徑且檔案存在，初始化 MediaPlayer
+            // 以下保留原本的 MediaPlayer 與 DispatcherTimer 初始化...
             if (!string.IsNullOrWhiteSpace(this.audioPath) && File.Exists(this.audioPath))
             {
                 audioPlayer = new MediaPlayer();

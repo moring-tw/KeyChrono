@@ -1,0 +1,51 @@
+﻿<Window x:Class="KeyChrono.StatusWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="計時器狀態" Height="100" Width="180"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" MouseLeftButtonDown="Window_MouseLeftButtonDown">
+    <Grid>
+        <!-- 萬一圖片遺失的備用半透明黑色背景 -->
+        <Grid x:Name="BackgroundContainer" Background="#80000000">
+            <!-- <Border Background="#80000000" CornerRadius="10" />-->
+            <Image x:Name="BgImage" Stretch="Fill" />
+        </Grid>
+
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock Text="全域熱鍵監聽" Foreground="SpringGreen" FontWeight="Bold" FontSize="26" Margin="0,0,0,10" HorizontalAlignment="Center">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="Black" BlurRadius="5" ShadowDepth="2" />
+                </TextBlock.Effect>
+            </TextBlock>
+            <ToggleButton x:Name="StatusToggle" Width="90" Height="30" 
+                          Checked="StatusToggle_Changed" Unchecked="StatusToggle_Changed"
+                          ToolTip="按下 Shift + F1 改變狀態" Cursor="Hand">
+                <ToggleButton.Style>
+                    <Style TargetType="ToggleButton">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border Background="{TemplateBinding Background}" CornerRadius="15">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsChecked" Value="False">
+                                <Setter Property="Background" Value="#F44336"/>
+                                <Setter Property="Content" Value="已關閉"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Background" Value="#4CAF50"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="Content" Value="已開啟"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </ToggleButton.Style>
+            </ToggleButton>
+        </StackPanel>
+    </Grid>
+</Window>
